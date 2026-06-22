@@ -1,0 +1,123 @@
+#!/usr/bin/env ruby
+# Copyright (C) 2026 Paul Philippov <paul@themactep.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+require 'base64'
+require 'rexml/document'
+require 'optparse'
+
+def uid_to_path(uri)
+  return uri unless uri.start_with?('file://')
+  require 'uri'
+  require 'cgi'
+  CGI.unescape(URI.parse(uri).path)
+end
+
+def extract_preview(scut6_path)
+  doc = REXML::Document.new(File.read(scut6_path))
+  scal = doc.root.elements["sure_cuts_alot"]
+  return nil unless scal
+
+  preview = scal.elements["preview"]
+  return nil unless preview
+
+  data = preview.attributes["data"]
+  return nil if data.nil? || data.empty?
+
+  Base64.decode64(data)
+end
+
+def resize_png(png_data, output, size)
+  require 'tempfile'
+  tmp = Tempfile.new(['scut-thumb-', '.png'])
+  tmp.binmode
+  tmp.write(png_data)
+  tmp.flush
+
+  begin
+    require 'mini_magick'
+    img = MiniMagick::Image.read(png_data)
+    img.resize "#{size}x#{size}>"
+    img.write output
+  rescue LoadError, StandardError
+    system('convert', tmp.path, '-resize', "#{size}x#{size}>", output,
+           exception: true, in: '/dev/null', out: '/dev/null', err: '/dev/null')
+  end
+
+  tmp.close!
+  File.exist?(output)
+end
+
+def thumbnail(input, output, size)
+  input = uid_to_path(input) if input.include?('://')
+
+  png = extract_preview(input)
+  return false unless png && png.bytesize > 0
+
+  if size.to_i > 0
+    return false unless resize_png(png, output, size.to_i)
+  else
+    File.write(output, png, mode: 'wb')
+  end
+
+  true
+end
+
+options = {
+  size: 256,
+  output: nil,
+  force: false
+}
+
+opt_parser = OptionParser.new do |opts|
+  opts.banner = "Usage: scut-thumbnailer [options] <input> [output] [size]"
+  opts.summary_width = 24
+  opts.on("-s", "--size SIZE", Integer) { |v| options[:size] = v }
+  opts.on("-o", "--output DIR") { |v| options[:output] = v }
+  opts.on("-f", "--force") { options[:force] = true }
+  opts.on("-h", "--help") { puts opts; exit }
+end
+
+opt_parser.parse!
+
+if ARGV.empty?
+  puts opt_parser
+  exit 1
+end
+
+if ARGV.length == 3 && ARGV[2].match?(/\A\d+\z/)
+  exit thumbnail(ARGV[0], ARGV[1], ARGV[2]) ? 0 : 1
+end
+
+ARGV.each do |input|
+  unless File.exist?(input)
+    $stderr.puts "Skipping (not found): #{input}"
+    next
+  end
+
+  out_name = "#{File.basename(input, '.*')}.png"
+  out_dir  = options[:output] || File.dirname(input)
+  out_path = File.join(out_dir, out_name)
+
+  if File.exist?(out_path) && !options[:force]
+    $stderr.puts "Skipping (exists, use -f): #{out_path}"
+    next
+  end
+
+  Dir.mkdir(out_dir) unless Dir.exist?(out_dir)
+
+  thumbnail(input, out_path, options[:size]) ? (puts out_path) : (next)
+end

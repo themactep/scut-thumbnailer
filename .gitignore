@@ -1,0 +1,9 @@
+*.gem
+*.rbc
+.bundle
+.sass-cache
+__pycache__
+.DS_Store
+*.swp
+*.swo
+*~

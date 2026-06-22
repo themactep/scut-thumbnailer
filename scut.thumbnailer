@@ -1,0 +1,3 @@
+[Thumbnailer Entry]
+Exec=@BINDIR@/scut-thumbnailer %i %o %s
+MimeType=application/x-sure-cuts-alot;

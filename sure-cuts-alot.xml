@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-sure-cuts-alot">
+    <comment>Sure Cuts A Lot project</comment>
+    <comment xml:lang="en">Sure Cuts A Lot project</comment>
+    <glob pattern="*.scut"/>
+    <glob pattern="*.scut2"/>
+    <glob pattern="*.scut3"/>
+    <glob pattern="*.scut4"/>
+    <glob pattern="*.scut5"/>
+    <glob pattern="*.scut6"/>
+    <magic priority="60">
+      <match type="string" value="&lt;sure_cuts_alot" offset="0:1024"/>
+    </magic>
+  </mime-type>
+</mime-info>
